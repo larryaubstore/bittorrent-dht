@@ -21,10 +21,14 @@ var string2compact = require('string2compact')
 var sha = require('sha.js')
 var bufcmp = require('buffer-equal')
 
+//var BOOTSTRAP_NODES = [
+//  'router.bittorrent.com:6881',
+//  'router.utorrent.com:6881',
+//  'dht.transmissionbt.com:6881'
+//]
+
 var BOOTSTRAP_NODES = [
-  'router.bittorrent.com:6881',
-  'router.utorrent.com:6881',
-  'dht.transmissionbt.com:6881'
+  '192.168.0.100:6881'
 ]
 
 var BOOTSTRAP_TIMEOUT = 10000
@@ -728,6 +732,7 @@ DHT.prototype._removePeer = function (addr, infoHash) {
 DHT.prototype._bootstrap = function (nodes) {
   var self = this
 
+  console.log("LARRY");
   self._debug('bootstrap with %s', JSON.stringify(nodes))
 
   var contacts = nodes.map(function (obj) {
