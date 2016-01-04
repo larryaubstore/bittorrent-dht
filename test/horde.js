@@ -1,18 +1,19 @@
-var test = require('tape')
-var parallel = require('run-parallel')
 var common = require('./common')
 var DHT = require('../')
+var once = require('once')
+var parallel = require('run-parallel')
+var test = require('tape')
 
-test('announce+lookup with 2-20 DHTs', function (t) {
-  var from = 2
-  var to = 20
+var from = 2
+var to = 20
 
-  var numRunning = to - from + 1
-  for (var i = from; i <= to; i++) {
-    runAnnounceLookupTest(i)
-  }
+for (var i = from; i <= to; i++) {
+  runAnnounceLookupTest(i)
+}
 
-  function runAnnounceLookupTest (numInstances) {
+function runAnnounceLookupTest (numInstances) {
+  test('horde: announce+lookup with ' + numInstances + ' DHTs', function (t) {
+    var numRunning = numInstances
     findPeers(numInstances, t, function (err, dhts) {
       if (err) throw err
 
@@ -25,20 +26,22 @@ test('announce+lookup with 2-20 DHTs', function (t) {
         }
 
         process.nextTick(function () {
-          dht.destroy(function () {
+          dht.destroy(function (err) {
+            t.error(err, 'destroyed dht')
             if (--numRunning === 0) t.end()
           })
         })
       })
     })
-  }
-})
+  })
+}
 
 /**
  *  Initialize [numInstances] dhts, have one announce an infoHash, and another perform a
  *  lookup. Times out after a while.
  */
 function findPeers (numInstances, t, cb) {
+  cb = once(cb)
   var dhts = []
   var timeoutId = setTimeout(function () {
     cb(new Error('Timed out for ' + numInstances + ' instances'))
@@ -54,13 +57,13 @@ function findPeers (numInstances, t, cb) {
   }
 
   // wait until every dht is listening
-  parallel(dhts.map(function (dht) {
+  var tasks = dhts.map(function (dht) {
     return function (cb) {
-      dht.listen(function () {
-        cb(null)
-      })
+      dht.listen(cb)
     }
-  }), function () {
+  })
+
+  parallel(tasks, function () {
     // add each other to routing tables
     makeFriends(dhts)
 

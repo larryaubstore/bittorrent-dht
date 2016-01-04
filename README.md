@@ -35,8 +35,8 @@ npm install bittorrent-dht
 npm install magnet-uri
 ```
 
-```javascript
-var DHT    = require('bittorrent-dht')
+```js
+var DHT = require('bittorrent-dht')
 var magnet = require('magnet-uri')
 
 var uri = 'magnet:?xt=urn:btih:e3811b9539cacff680e418124272177c47477157'
@@ -58,10 +58,9 @@ dht.on('ready', function () {
   dht.lookup(parsed.infoHash)
 })
 
-dht.on('peer', function (addr, hash, from) {
+dht.on('peer', function (addr, infoHash, from) {
   console.log('found potential peer ' + addr + ' through ' + from)
 })
-
 ```
 
 ### api
@@ -234,7 +233,6 @@ var ed = require('ed25519-supercop')
 var keypair = ed.createKeyPair(ed.createSeed())
 
 var value = new Buffer(200).fill('whatever') // the payload you want to send
-var sig = keypair.sign(value)
 var opts = {
   k: keypair.publicKey,
   seq: 0,
@@ -267,18 +265,18 @@ alive, since nodes may discard data nodes older than 2 hours.
 Read a data record (created with `.put()`) from the DHT.
 ([BEP 44](http://bittorrent.org/beps/bep_0044.html))
 
-Given `hash`, a buffer, lookup data content from the DHT, sending the result in
-`callback(err, res)`.
+Given `hash`, a hex string or buffer, lookup data content from the DHT, sending the
+result in `callback(err, res)`.
 
 `res` objects are similar to the options objects written to the DHT with
 `.put()`:
 
 * `res.v` - the value put in
 * `res.id` - the node that returned the content
-* `res.k` - the value put in (required for mutable data)
-* `res.sig` - signature (required for mutable data)
-* `res.seq` - sequence (optional, only present for mutable data)
-* `res.salt` - sequence (optional, only present for mutable data)
+* `res.k` - the public key (only present for mutable data)
+* `res.sig` - the signature (only present for mutable data)
+* `res.seq` - the sequence (optional, only present for mutable data)
+* `res.salt` - the salt (optional, only present for mutable data)
 
 ### events
 
