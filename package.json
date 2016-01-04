@@ -53,6 +53,7 @@
   },
   "scripts": {
     "test": "standard && tape test/*.js",
-    "test-live": "tape test/live/*.js"
+    "test-live": "tape test/live/*.js",
+    "test-mock": "node test/mockrpc.js"
   }
 }
