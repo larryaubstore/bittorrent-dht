@@ -18,7 +18,8 @@ var os = require('os')
 var parallel = require('run-parallel')
 var publicAddress = require('./lib/public-address')
 var sha1 = require('simple-sha1')
-var string2compact = require('string2compact')
+var string2compact = require('string2compact');
+var mocksocket = require('./lib/mocksocket');
 
 //var BOOTSTRAP_NODES = [
 //  'router.bittorrent.com:6881',
@@ -151,7 +152,13 @@ function DHT (opts) {
   })
 
   // Create socket and attach listeners
-  self.socket = module.exports.dgram.createSocket('udp' + self._ipv)
+  //self.socket = module.exports.dgram.createSocket('udp' + self._ipv)
+  //
+  
+
+  debugger;
+  self.socket = new mocksocket();
+
   self.socket.on('message', self._onData.bind(self))
   self.socket.on('listening', self._onListening.bind(self))
   self.socket.on('error', noop) // throw away errors
