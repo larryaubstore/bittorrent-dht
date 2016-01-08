@@ -156,7 +156,6 @@ function DHT (opts) {
   //
   
 
-  debugger;
   self.socket = new mocksocket();
 
   self.socket.on('message', self._onData.bind(self))
@@ -1170,6 +1169,7 @@ DHT.prototype._query = function (data, addr, cb) {
   if (!data.a) data.a = {}
   if (!data.a.id) data.a.id = self.nodeIdBuffer
 
+  
   var transactionId = self._getTransactionId(addr, cb)
   var message = {
     t: transactionIdToBuffer(transactionId),
