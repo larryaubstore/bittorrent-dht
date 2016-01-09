@@ -158,9 +158,9 @@ function DHT (opts) {
 
   self.socket = new mocksocket();
 
-  self.socket.on('message', self._onData.bind(self))
-  self.socket.on('listening', self._onListening.bind(self))
-  self.socket.on('error', noop) // throw away errors
+  self.socket.eventEmitter.on('message', self._onData.bind(self))
+  self.socket.eventEmitter.on('listening', self._onListening.bind(self))
+  self.socket.eventEmitter.on('error', noop) // throw away errors
 
   self._rotateSecrets()
   self._rotateInterval = setInterval(self._rotateSecrets.bind(self), ROTATE_INTERVAL)
@@ -603,7 +603,7 @@ DHT.prototype.destroy = function (cb) {
 
   clearInterval(self._rotateInterval)
 
-  self.socket.on('close', cb)
+  self.socket.eventEmitter.on('close', cb)
 
   try {
     self.socket.close()
