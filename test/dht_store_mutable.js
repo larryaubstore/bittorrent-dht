@@ -1,8 +1,8 @@
 var common = require('./common')
 var DHT = require('../')
 var ed = require('ed25519-supercop')
-var sha1 = require('simple-sha1')
 var test = require('tape')
+var crypto = require('crypto')
 
 test('local mutable put/get', function (t) {
   t.plan(4)
@@ -23,12 +23,15 @@ test('local mutable put/get', function (t) {
       seq: 0,
       v: value
     }
-    var expectedHash = sha1.sync(opts.k)
 
-    dht.put(opts, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    var expectedHash = crypto.createHash('sha1').update(opts.k).digest()
 
-      t.equal(hash, expectedHash, 'hash of the public key')
+    dht.put(opts, function (_, hash) {
+      t.equal(
+        hash.toString('hex'),
+        expectedHash.toString('hex'),
+        'hash of the public key'
+      )
       dht.get(hash, function (err, res) {
         t.ifError(err)
         t.equal(res.v.toString('utf8'), opts.v.toString('utf8'),
@@ -41,7 +44,7 @@ test('local mutable put/get', function (t) {
 })
 
 test('multiparty mutable put/get', function (t) {
-  t.plan(3)
+  t.plan(4)
 
   var keypair = ed.createKeyPair(ed.createSeed())
 
@@ -57,12 +60,12 @@ test('multiparty mutable put/get', function (t) {
 
   var pending = 2
   dht1.listen(function () {
-    dht2.addNode('127.0.0.1:' + dht1.address().port)
+    dht2.addNode({ host: '127.0.0.1', port: dht1.address().port })
     dht2.once('node', ready)
   })
 
   dht2.listen(function () {
-    dht1.addNode('127.0.0.1:' + dht2.address().port)
+    dht1.addNode({ host: '127.0.0.1', port: dht2.address().port })
     dht1.once('node', ready)
   })
 
@@ -75,12 +78,13 @@ test('multiparty mutable put/get', function (t) {
       sign: sign(keypair),
       v: value
     }
-    var expectedHash = sha1.sync(opts.k)
 
-    dht1.put(opts, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    var expectedHash = crypto.createHash('sha1').update(opts.k).digest()
 
-      t.equal(hash, expectedHash, 'hash of the public key')
+    dht1.put(opts, function (err, hash) {
+      t.error(err)
+
+      t.deepEqual(hash, expectedHash, 'hash of the public key')
       dht2.get(hash, function (err, res) {
         t.ifError(err)
         t.equal(res.v.toString('utf8'), opts.v.toString('utf8'),
@@ -92,7 +96,7 @@ test('multiparty mutable put/get', function (t) {
 })
 
 test('multiparty mutable put/get sequence', function (t) {
-  t.plan(9)
+  t.plan(12)
 
   var keypair = ed.createKeyPair(ed.createSeed())
   var dht1 = new DHT({ bootstrap: false, verify: ed.verify })
@@ -107,12 +111,12 @@ test('multiparty mutable put/get sequence', function (t) {
 
   var pending = 2
   dht1.listen(function () {
-    dht2.addNode('127.0.0.1:' + dht1.address().port)
+    dht2.addNode({ host: '127.0.0.1', port: dht1.address().port })
     dht2.once('node', ready)
   })
 
   dht2.listen(function () {
-    dht1.addNode('127.0.0.1:' + dht2.address().port)
+    dht1.addNode({ host: '127.0.0.1', port: dht2.address().port })
     dht1.once('node', ready)
   })
 
@@ -125,12 +129,13 @@ test('multiparty mutable put/get sequence', function (t) {
       seq: 0,
       v: value
     }
-    var expectedHash = sha1.sync(opts.k)
 
-    dht1.put(opts, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    var expectedHash = crypto.createHash('sha1').update(opts.k).digest()
 
-      t.equal(hash, expectedHash, 'hash of the public key')
+    dht1.put(opts, function (err, hash) {
+      t.error(err)
+
+      t.deepEqual(hash, expectedHash, 'hash of the public key')
       dht2.get(hash, function (err, res) {
         t.ifError(err)
         t.equal(res.v.toString('utf8'), opts.v.toString('utf8'),
@@ -144,10 +149,10 @@ test('multiparty mutable put/get sequence', function (t) {
       opts.seq ++
       opts.v = fill(32, 'whatever')
 
-      dht1.put(opts, function (errors, hash) {
-        errors.forEach(t.error.bind(t))
+      dht1.put(opts, function (err, hash) {
+        t.error(err)
 
-        t.equal(hash, expectedHash, 'hash of the public key (again)')
+        t.deepEqual(hash, expectedHash, 'hash of the public key (again)')
         dht2.get(hash, function (err, res) {
           t.ifError(err)
           t.equal(res.v.toString('utf8'), opts.v.toString('utf8'),
@@ -162,10 +167,10 @@ test('multiparty mutable put/get sequence', function (t) {
       opts.seq ++
       opts.v = fill(999, 'cool')
 
-      dht1.put(opts, function (errors, hash) {
-        errors.forEach(t.error.bind(t))
+      dht1.put(opts, function (err, hash) {
+        t.error(err)
 
-        t.equal(hash, expectedHash, 'hash of the public key (yet again)')
+        t.deepEqual(hash, expectedHash, 'hash of the public key (yet again)')
         dht2.get(hash, function (err, res) {
           t.ifError(err)
           t.equal(res.v.toString('utf8'), opts.v.toString('utf8'),
@@ -178,7 +183,7 @@ test('multiparty mutable put/get sequence', function (t) {
 })
 
 test('salted multikey multiparty mutable put/get sequence', function (t) {
-  t.plan(9)
+  t.plan(12)
 
   var keypair = ed.createKeyPair(ed.createSeed())
 
@@ -194,12 +199,12 @@ test('salted multikey multiparty mutable put/get sequence', function (t) {
 
   var pending = 2
   dht1.listen(function () {
-    dht2.addNode('127.0.0.1:' + dht1.address().port)
+    dht2.addNode({ host: '127.0.0.1', port: dht1.address().port })
     dht2.once('node', ready)
   })
 
   dht2.listen(function () {
-    dht1.addNode('127.0.0.1:' + dht2.address().port)
+    dht1.addNode({ host: '127.0.0.1', port: dht2.address().port })
     dht1.once('node', ready)
   })
 
@@ -221,13 +226,14 @@ test('salted multikey multiparty mutable put/get sequence', function (t) {
       sign: sign(keypair),
       v: svalue
     }
-    var first = sha1.sync(Buffer.concat([ new Buffer('first'), fopts.k ]))
-    var second = sha1.sync(Buffer.concat([ new Buffer('second'), sopts.k ]))
 
-    dht1.put(fopts, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    var first = crypto.createHash('sha1').update('first').update(fopts.k).digest()
+    var second = crypto.createHash('sha1').update('second').update(sopts.k).digest()
 
-      t.equal(hash, first, 'first hash')
+    dht1.put(fopts, function (err, hash) {
+      t.error(err)
+
+      t.deepEqual(hash, first, 'first hash')
       dht2.get(hash, function (err, res) {
         t.ifError(err)
         t.equal(res.v.toString('utf8'), fopts.v.toString('utf8'),
@@ -238,10 +244,10 @@ test('salted multikey multiparty mutable put/get sequence', function (t) {
     })
 
     function putSecondKey () {
-      dht1.put(sopts, function (errors, hash) {
-        errors.forEach(t.error.bind(t))
+      dht1.put(sopts, function (err, hash) {
+        t.error(err)
 
-        t.equal(hash, second, 'second hash')
+        t.deepEqual(hash, second, 'second hash')
         dht2.get(hash, function (err, res) {
           t.ifError(err)
           t.equal(res.v.toString('utf8'), sopts.v.toString('utf8'),
@@ -256,10 +262,10 @@ test('salted multikey multiparty mutable put/get sequence', function (t) {
       fopts.seq ++
       fopts.v = fill(999, 'cool')
 
-      dht1.put(fopts, function (errors, hash) {
-        errors.forEach(t.error.bind(t))
+      dht1.put(fopts, function (err, hash) {
+        t.error(err)
 
-        t.equal(hash, first, 'first salt (again)')
+        t.deepEqual(hash, first, 'first salt (again)')
         dht2.get(hash, function (err, res) {
           t.ifError(err)
           t.equal(res.v.toString('utf8'), fopts.v.toString('utf8'),
@@ -272,7 +278,7 @@ test('salted multikey multiparty mutable put/get sequence', function (t) {
 })
 
 test('transitive mutable update', function (t) {
-  t.plan(3)
+  t.plan(4)
 
   var keypair = ed.createKeyPair(ed.createSeed())
 
@@ -292,12 +298,12 @@ test('transitive mutable update', function (t) {
 
   var pending = 2
   dht1.listen(function () {
-    dht2.addNode('127.0.0.1:' + dht1.address().port)
+    dht2.addNode({ host: '127.0.0.1', port: dht1.address().port })
     dht2.once('node', ready)
   })
 
   dht2.listen(function () {
-    dht3.addNode('127.0.0.1:' + dht2.address().port)
+    dht3.addNode({ host: '127.0.0.1', port: dht2.address().port })
     dht3.once('node', ready)
   })
 
@@ -310,12 +316,13 @@ test('transitive mutable update', function (t) {
       seq: 0,
       v: value
     }
-    var expectedHash = sha1.sync(opts.k)
 
-    dht1.put(opts, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    var expectedHash = crypto.createHash('sha1').update(opts.k).digest()
 
-      t.equal(hash, expectedHash, 'hash of the public key')
+    dht1.put(opts, function (err, hash) {
+      t.error(err)
+
+      t.deepEqual(hash, expectedHash, 'hash of the public key')
 
       dht3.get(expectedHash, function (err, res) {
         t.ifError(err)
@@ -328,7 +335,7 @@ test('transitive mutable update', function (t) {
 })
 
 test('mutable update mesh', function (t) {
-  t.plan(9)
+  t.plan(12)
   /*
     0 <-> 1 <-> 2
           ^     ^
@@ -365,7 +372,7 @@ test('mutable update mesh', function (t) {
     var pending = edges.length
     for (var i = 0; i < edges.length; i++) {
       (function (e) {
-        dht[e[1]].addNode('127.0.0.1:' + dht[e[0]].address().port)
+        dht[e[1]].addNode({ host: '127.0.0.1', port: dht[e[0]].address().port })
         dht[e[1]].once('node', function () {
           if (--pending === 0) ready()
         })
@@ -395,10 +402,11 @@ test('mutable update mesh', function (t) {
       seq: 0,
       v: value
     }
-    var xhash = sha1.sync(opts.k)
-    src.put(opts, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
-      t.equal(hash, xhash)
+
+    var xhash = crypto.createHash('sha1').update(opts.k).digest()
+    src.put(opts, function (err, hash) {
+      t.error(err)
+      t.equal(hash.toString('hex'), xhash.toString('hex'))
 
       dst.get(xhash, function (err, res) {
         t.ifError(err)
@@ -411,17 +419,17 @@ test('mutable update mesh', function (t) {
 })
 
 test('invalid sequence', function (t) {
-  t.plan(4)
+  t.plan(5)
 
   var keypair = ed.createKeyPair(ed.createSeed())
 
   var dht0 = new DHT({ bootstrap: false, verify: ed.verify })
   var dht1 = new DHT({ bootstrap: false, verify: ed.verify })
   dht0.listen(0, function () {
-    dht1.addNode('127.0.0.1:' + dht0.address().port)
+    dht1.addNode({ host: '127.0.0.1', port: dht0.address().port })
   })
   dht1.listen(0, function () {
-    dht0.addNode('127.0.0.1:' + dht1.address().port)
+    dht0.addNode({ host: '127.0.0.1', port: dht1.address().port })
   })
   t.once('end', function () {
     dht0.destroy()
@@ -445,11 +453,11 @@ test('invalid sequence', function (t) {
     }
     var hash0
 
-    dht0.put(opts0, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    dht0.put(opts0, function (err, hash) {
+      t.error(err)
       hash0 = hash
-      dht0.put(opts1, function (errors, hash) {
-        t.ok(errors.length, 'caught expected error: ' + errors[0])
+      dht0.put(opts1, function (err, hash) {
+        t.ok(err, 'caught expected error: ' + err)
         check()
       })
     })
@@ -469,17 +477,17 @@ test('invalid sequence', function (t) {
 })
 
 test('valid sequence', function (t) {
-  t.plan(4)
+  t.plan(6)
 
   var keypair = ed.createKeyPair(ed.createSeed())
 
   var dht0 = new DHT({ bootstrap: false, verify: ed.verify })
   var dht1 = new DHT({ bootstrap: false, verify: ed.verify })
   dht0.listen(0, function () {
-    dht1.addNode('127.0.0.1:' + dht0.address().port)
+    dht1.addNode({ host: '127.0.0.1', port: dht0.address().port })
   })
   dht1.listen(0, function () {
-    dht0.addNode('127.0.0.1:' + dht1.address().port)
+    dht0.addNode({ host: '127.0.0.1', port: dht1.address().port })
   })
   t.once('end', function () {
     dht0.destroy()
@@ -503,11 +511,11 @@ test('valid sequence', function (t) {
     }
     var hash0, hash1
 
-    dht0.put(opts0, function (errors, hash) {
-      errors.forEach(t.error.bind(t))
+    dht0.put(opts0, function (err, hash) {
+      t.error(err)
       hash0 = hash
-      dht0.put(opts1, function (errors, hash) {
-        errors.forEach(t.error.bind(t))
+      dht0.put(opts1, function (err, hash) {
+        t.error(err)
         hash1 = hash
         t.deepEqual(hash0, hash1)
         check()

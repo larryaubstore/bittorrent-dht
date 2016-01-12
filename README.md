@@ -1,6 +1,6 @@
 # bittorrent-dht [![travis][travis-image]][travis-url] [![npm][npm-image]][npm-url] [![downloads][downloads-image]][downloads-url]
 
-[travis-image]: https://img.shields.io/travis/feross/bittorrent-dht.svg?style=flat
+[travis-image]: https://img.shields.io/travis/feross/bittorrent-dht/master.svg?style=flat
 [travis-url]: https://travis-ci.org/feross/bittorrent-dht
 [npm-image]: https://img.shields.io/npm/v/bittorrent-dht.svg?style=flat
 [npm-url]: https://npmjs.org/package/bittorrent-dht
@@ -58,8 +58,8 @@ dht.on('ready', function () {
   dht.lookup(parsed.infoHash)
 })
 
-dht.on('peer', function (addr, infoHash, from) {
-  console.log('found potential peer ' + addr + ' through ' + from)
+dht.on('peer', function (peer, infoHash, from) {
+  console.log('found potential peer ' + peer.host + ':' + peer.port + ' through ' + from.host + ':' + from.port)
 })
 ```
 
@@ -73,8 +73,9 @@ If `opts` is specified, then the default options (shown below) will be overridde
 
 ``` js
 {
-  nodeId: '',   // 160-bit DHT node ID (Buffer or hex string, default: randomly generated)
-  bootstrap: [] // bootstrap servers (default: router.bittorrent.com:6881, router.utorrent.com:6881, dht.transmissionbt.com:6881)
+  nodeId: '',    // 160-bit DHT node ID (Buffer or hex string, default: randomly generated)
+  bootstrap: [], // bootstrap servers (default: router.bittorrent.com:6881, router.utorrent.com:6881, dht.transmissionbt.com:6881)
+  host: false    // host of local peer, if specified then announces get added to local table (String, disabled by default)
 }
 ```
 
@@ -99,11 +100,8 @@ as `peer` events. See the `peer` event below for more info.
 
 `infoHash` can be a string or Buffer. `callback` is called when the recursive lookup has
 terminated, and is called with two paramaters. The first is an `Error` or null. The second
-is an array of the K closest nodes. You usually don't need to use this info and can simply
-listen for `peer` events.
-
-Note: `dht.lookup()` should only be called after the ready event has fired, otherwise the
-lookup may fail because the DHT routing table doesn't contain enough nodes.
+is the number of nodes found that had peers. You usually don't need to use this info and
+can simply listen for `peer` events.
 
 
 #### `dht.listen([port], [address], [onlistening])`
@@ -122,9 +120,12 @@ Returns an object containing the address information for the listening socket of
 This object contains `address`, `family` and `port` properties.
 
 
-#### `dht.announce(infoHash, port, [callback])`
+#### `dht.announce(infoHash, [port], [callback])`
 
 Announce that the peer, controlling the querying node, is downloading a torrent on a port.
+
+If you omit `port` the implied port option will be set and other peers will use the public
+dht port as your announced port.
 
 If `dht.announce` is called soon (< 5 minutes) after `dht.lookup`, then the routing table
 generated during the lookup can be re-used, because the "tokens" sent by each node will
@@ -147,9 +148,9 @@ a single parameter that is an `Error` or null.
 #### `arr = dht.toArray()`
 
 Returns the nodes in the DHT as an array. This is useful for persisting the DHT
-to disk between restarts of a BitTorrent client (as recommended by the spec). Each node in the array is an object with `id` (hex string) and `addr` (string) properties.
+to disk between restarts of a BitTorrent client (as recommended by the spec). Each node in the array is an object with `host` (string) and `port` (number) properties.
 
-To restore the DHT nodes when instantiating a new `DHT` object, simply pass in the array as the value of the `bootstrap` option.
+To restore the DHT nodes when instantiating a new `DHT` object, simply loop over the nodes in the array and add them with the `addNode` method.
 
 ```js
 var dht1 = new DHT()
@@ -163,19 +164,29 @@ dht1.destroy()
 // some time passes ...
 
 // initialize a new dht with the same routing table as the first
-var dht2 = new DHT({ bootstrap: arr })
+var dht2 = new DHT()
+
+arr.forEach(function (node) {
+  dht2.add(node)
+})
 ```
 
 
-#### `dht.addNode(addr, [nodeId])`
+#### `dht.addNode(node)`
 
 Manually add a node to the DHT routing table. If there is space in the routing table (or
 an unresponsive node can be evicted to make space), the node will be added. If not, the
 node will not be added. This is useful to call when a peer wire sends a `PORT` message to
 share their DHT port.
 
-If `nodeId` is undefined, then the peer will be pinged to learn their node id. If the peer does not respond, the will not be added to the routing table.
+A node should look like this:
 
+``` js
+{
+  host: nodeHost,
+  port: nodePort
+}
+```
 
 #### `dht.destroy([callback])`
 
@@ -201,8 +212,8 @@ var dht = new DHT()
 var value = new Buffer(200).fill('abc')
 
 dht.on('ready', function () {
-  dht.put({ v: value }, function (errors, hash) {
-    console.error('errors=', errors)
+  dht.put({ v: value }, function (err, hash) {
+    console.error('error=', err)
     console.log('hash=', hash)
   })
 })
@@ -245,17 +256,17 @@ var opts = {
 var DHT = require('bittorrent-dht')
 var dht = new DHT
 dht.on('ready', function () {
-  dht.put(opts, function (errors, hash) {
-    console.error('errors=', errors)
+  dht.put(opts, function (err, hash) {
+    console.error('error=', err)
     console.log('hash=', hash)
   })
 })
 ```
 
-In either mutable or immutable forms, `callback(errors, hash)` fires with an
-array `errors` of any errors encountered when announcing the content to peers
-and `hash`, the location where the mutable or immutable content can be retrieved
-(with `dht.get(hash)`).
+In either mutable or immutable forms, `callback(error, hash, n)` fires with an
+`error` if no nodes were able to store the `value`. `n` is set the amount of peers
+that accepted the `put` and `hash`, the location where the mutable or immutable
+content can be retrieved (with `dht.get(hash)`).
 
 Note that you should call `.put()` every hour for content that you want to keep
 alive, since nodes may discard data nodes older than 2 hours.
@@ -282,8 +293,9 @@ result in `callback(err, res)`.
 
 #### `dht.on('ready', function () { ... })`
 
-Emitted when the DHT is ready to handle lookups (i.e. the routing table is sufficiently
-populated via the bootstrap nodes).
+Emitted when the DHT is fully bootstrapped (i.e. the routing table is sufficiently
+populated via the bootstrap nodes). Note that it is okay to do lookups before the 'ready'
+event fires.
 
 Note: If you initialize the DHT with the `{ bootstrap: false }` option, then the 'ready'
 event will fire on the next tick even if there are not any nodes in the routing table.
@@ -296,9 +308,9 @@ pass this option.
 Emitted when the DHT is listening.
 
 
-#### `dht.on('peer', function (addr, infoHash, from) { ... })`
+#### `dht.on('peer', function (peer, infoHash, from) { ... })`
 
-Emitted when a potential peer is found. `addr` is of the form `IP_ADDRESS:PORT`.
+Emitted when a potential peer is found. `peer` is of the form `{host, port}`.
 `infoHash` is the torrent info hash of the swarm that the peer belongs to. Emitted
 in response to a `lookup(infoHash)` call.
 
@@ -310,12 +322,12 @@ Emitted when the DHT has a fatal error.
 
 #### internal events
 
-#### `dht.on('node', function (addr, nodeId, from) { ... })`
+#### `dht.on('node', function (node) { ... })`
 
 Emitted when the DHT finds a new node.
 
 
-#### `dht.on('announce', function (addr, infoHash) { ... })`
+#### `dht.on('announce', function (peer, infoHash) { ... })`
 
 Emitted when a peer announces itself in order to be stored in the DHT.
 
